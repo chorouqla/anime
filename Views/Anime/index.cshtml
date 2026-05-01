@@ -1,0 +1,242 @@
+@model List<AnimeProject.Models.Anime>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Anime Explorer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        /* Search bar styles */
+        .search-section {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .search-box {
+            padding: 10px;
+            width: 300px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .search-btn, .clear-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .search-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        .search-btn:hover {
+            background-color: #0056b3;
+        }
+        .clear-btn {
+            background-color: #6c757d;
+            color: white;
+        }
+        .clear-btn:hover {
+            background-color: #5a6268;
+        }
+        /* Watchlist link */
+        .watchlist-link {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        .watchlist-link a {
+            font-size: 18px;
+            color: #28a745;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .watchlist-link a:hover {
+            text-decoration: underline;
+        }
+        /* Anime grid */
+        .anime-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .anime-card {
+            width: 200px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+            padding: 10px;
+            transition: transform 0.2s;
+        }
+        .anime-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .anime-card img {
+            width: 100%;
+            border-radius: 10px;
+        }
+        .anime-card h3 {
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .anime-card a {
+            text-decoration: none;
+            color: #333;
+        }
+        .add-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .add-btn:hover {
+            background-color: #218838;
+        }
+        /* Pagination */
+        .pagination {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .pagination a, .pagination span {
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 0 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-decoration: none;
+            color: #007bff;
+        }
+        .pagination .current {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .pagination a:hover {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Anime Explorer</h1>
+        
+        <!-- Watchlist link with count -->
+        <div class="watchlist-link">
+            <a href="/Anime/Watchlist">📋 My Watchlist (<span id="watchlistCount">0</span>)</a>
+        </div>
+        
+        <!-- Search bar -->
+        <div class="search-section">
+            <input type="text" id="searchInput" class="search-box" placeholder="Search anime... (e.g., Naruto, One Piece, Dragon Ball)" value="@ViewBag.SearchTerm">
+            <button onclick="searchAnime()" class="search-btn">🔍 Search</button>
+            <button onclick="clearSearch()" class="clear-btn">Clear</button>
+        </div>
+        
+        <!-- Anime grid -->
+        <div class="anime-grid">
+            @foreach (var anime in Model)
+            {
+                <div class="anime-card">
+                    <a href="/Anime/Details?id=@anime.Id">
+                        <img src="@anime.Images?.Jpg?.ImageUrl" alt="@anime.Title" />
+                        <h3>@anime.Title</h3>
+                        <p>⭐ @anime.Rating?.ToString("0.0")</p>
+                        <p>📺 @anime.Episodes episodes</p>
+                    </a>
+                    <button onclick="addToWatchlist(@anime.Id, '@anime.Title.Replace("'", "\\'")')" class="add-btn">
+                        ➕ Add to Watchlist
+                    </button>
+                </div>
+            }
+        </div>
+        
+        <!-- Pagination / Load more -->
+        <div class="pagination">
+            @if (ViewBag.CurrentPage > 1)
+            {
+                <a href="#" onclick="changePage(@(ViewBag.CurrentPage - 1))">« Previous</a>
+            }
+            
+            <span class="current">Page @ViewBag.CurrentPage</span>
+            
+            @if (ViewBag.CurrentPage < ViewBag.TotalPages)
+            {
+                <a href="#" onclick="changePage(@(ViewBag.CurrentPage + 1))">Next »</a>
+            }
+        </div>
+    </div>
+    
+    <script>
+        // Update watchlist count on every page
+        function updateWatchlistCount() {
+            let watchlist = JSON.parse(localStorage.getItem('animeWatchlist') || '[]');
+            document.getElementById('watchlistCount').innerText = watchlist.length;
+        }
+        
+        // Add anime to watchlist
+        function addToWatchlist(id, title) {
+            let watchlist = JSON.parse(localStorage.getItem('animeWatchlist') || '[]');
+            
+            if (!watchlist.some(item => item.id === id)) {
+                watchlist.push({ id: id, title: title });
+                localStorage.setItem('animeWatchlist', JSON.stringify(watchlist));
+                alert('✓ ' + title + ' added to your watchlist!');
+                updateWatchlistCount();
+            } else {
+                alert(title + ' is already in your watchlist!');
+            }
+        }
+        
+        // Search function
+        function searchAnime() {
+            let searchTerm = document.getElementById('searchInput').value;
+            if (searchTerm) {
+                window.location.href = '/Anime?search=' + encodeURIComponent(searchTerm);
+            } else {
+                alert('Please enter an anime name to search');
+            }
+        }
+        
+        // Clear search
+        function clearSearch() {
+            window.location.href = '/Anime';
+        }
+        
+        // Change page (for pagination)
+        function changePage(page) {
+            let searchTerm = '@ViewBag.SearchTerm';
+            if (searchTerm) {
+                window.location.href = '/Anime?page=' + page + '&search=' + encodeURIComponent(searchTerm);
+            } else {
+                window.location.href = '/Anime?page=' + page;
+            }
+        }
+        
+        // Load watchlist count when page loads
+        updateWatchlistCount();
+    </script>
+</body>
+</html>
